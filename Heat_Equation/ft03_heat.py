@@ -45,7 +45,7 @@ v = TestFunction(V)
 f = Constant(beta - 2 - 2*alpha)
 
 # Implicit Euler
-#F = u*v*dx + dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx
+F = u*v*dx + dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx
 
 #Trapezoidal
 #F = u*v*dx + 0.5*dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx + 0.5*dt*dot(grad(u_n), grad(v))*dx
@@ -67,18 +67,6 @@ k3 = div(grad(u_n + dt*k2/2)) + (f)
 k4 = div(grad(u_n + dt*k3)) + (f)
 
 F = u*v*dx - u_n*v*dx - (dt/6)*(k1 + 2*k2 + 2*k3 + k4)*v*dx
-'''
-'''
-F = u*v*dx - u_n*v*dx - (dt/2)*((f*v - dot(grad(u_n), grad(v))) \
-  + ((f*v - dot(grad(u_n + dt*f), grad(v))) - (dt)*dot(grad(u_n),grad(div(grad(v))))))*dx
-'''
-'''
-  + 2*((f*v - dot(grad(u_n + dt*f/2), grad(v))) - (dt/2)*dot(grad(u_n),grad(div(grad(v)))) \
-  - (dt*dt/4)*dot(grad(f),grad(div(grad(v)))) - (dt*dt/4)*dot(grad(u_n),grad(div(grad(div(grad(v))))))) \
-  + (f*v - dot(grad(u_n + dt*f/2), grad(v))) - (dt/2)*dot(grad(u_n),grad(div(grad(v)))) \
-  - (dt*dt/4)*dot(grad(f),grad(div(grad(v)))) - (dt*dt/4)*dot(grad(u_n),grad(div(grad(div(grad(v)))))) \
-  - (dt*dt*dt/8)*dot(grad(f),grad(div(grad(div(grad(v)))))) \
-  - (dt*dt*dt/8)*dot(grad(u_n),grad(div(grad(div(grad(div(grad(v)))))))))*dx
 '''
 
 a, L = lhs(F), rhs(F)
