@@ -13,6 +13,7 @@ Test problem is chosen to give an exact solution at all nodes of the mesh.
 from __future__ import print_function
 from fenics import *
 import numpy as np
+import matplotlib.pyplot as plt
 
 T = 2.0            # final time
 num_steps = 10     # number of time steps
@@ -43,7 +44,43 @@ u = TrialFunction(V)
 v = TestFunction(V)
 f = Constant(beta - 2 - 2*alpha)
 
-F = u*v*dx + dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx
+# Implicit Euler
+#F = u*v*dx + dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx
+
+#Trapezoidal
+#F = u*v*dx + 0.5*dt*dot(grad(u), grad(v))*dx - (u_n + dt*f)*v*dx + 0.5*dt*dot(grad(u_n), grad(v))*dx
+
+#Explicit Euler
+#F = u*v*dx + dt*dot(grad(u_n), grad(v))*dx - (u_n + dt*f)*v*dx
+
+'''
+#Heun's Method
+k1 = div(grad(u_n)) + f
+k2 = div(grad(u_n + dt*k1)) + (f)
+F = u*v*dx - u_n*v*dx - (dt/2)*(k1 + k2)*v*dx
+'''
+'''
+#RK4
+k1 = div(grad(u_n)) + f
+k2 = div(grad(u_n + dt*k1/2)) + (f)
+k3 = div(grad(u_n + dt*k2/2)) + (f)
+k4 = div(grad(u_n + dt*k3)) + (f)
+
+F = u*v*dx - u_n*v*dx - (dt/6)*(k1 + 2*k2 + 2*k3 + k4)*v*dx
+'''
+'''
+F = u*v*dx - u_n*v*dx - (dt/2)*((f*v - dot(grad(u_n), grad(v))) \
+  + ((f*v - dot(grad(u_n + dt*f), grad(v))) - (dt)*dot(grad(u_n),grad(div(grad(v))))))*dx
+'''
+'''
+  + 2*((f*v - dot(grad(u_n + dt*f/2), grad(v))) - (dt/2)*dot(grad(u_n),grad(div(grad(v)))) \
+  - (dt*dt/4)*dot(grad(f),grad(div(grad(v)))) - (dt*dt/4)*dot(grad(u_n),grad(div(grad(div(grad(v))))))) \
+  + (f*v - dot(grad(u_n + dt*f/2), grad(v))) - (dt/2)*dot(grad(u_n),grad(div(grad(v)))) \
+  - (dt*dt/4)*dot(grad(f),grad(div(grad(v)))) - (dt*dt/4)*dot(grad(u_n),grad(div(grad(div(grad(v)))))) \
+  - (dt*dt*dt/8)*dot(grad(f),grad(div(grad(div(grad(v)))))) \
+  - (dt*dt*dt/8)*dot(grad(u_n),grad(div(grad(div(grad(div(grad(v)))))))))*dx
+'''
+
 a, L = lhs(F), rhs(F)
 
 # Time-stepping
@@ -63,11 +100,12 @@ for n in range(num_steps):
 
     # Compute error at vertices
     u_e = interpolate(u_D, V)
-    error = np.abs(u_e.vector().array() - u.vector().array()).max()
+    error = np.abs(np.array(u_e.vector()) - np.array(u.vector())).max()
     print('t = %.2f: error = %.3g' % (t, error))
 
     # Update previous solution
     u_n.assign(u)
 
 # Hold plot
-interactive()
+plot(u)
+plt.show()
