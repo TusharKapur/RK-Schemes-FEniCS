@@ -52,7 +52,7 @@ def solve_PDE(method, T, num_steps):
   #u_D = Expression('0',
   #                  degree=2, alpha=alpha, beta=beta, gamma=gamma, t=0)
 
-  (f, f_np1, f_np2, f_np3) = calculate_f.get_problem_setup(alpha, beta, gamma)
+  (f, f_np05, _, f_np1) = calculate_f.get_problem_setup(alpha, beta, gamma)
 
   def boundary(x, on_boundary):
       return on_boundary
@@ -79,26 +79,31 @@ def solve_PDE(method, T, num_steps):
   for n in range(num_steps):
 
       # Update current time
-      t += dt
+      # t += dt  # moved this down. Otherwise your boundary conditions are ahead of time. Remeber: You are working with explicit schemes here.
       u_D.t = t
-      f_np1.t = t - dt
-      f_np2.t = t - 0.5*dt
-      f_np3.t = t - 0.5*dt
-      f.t = t
+      f_n.t = t  # - dt  , not needed, since we not use t_n
+      f_np05.t = t + 0.5*dt  # - 0.5*dt  , not needed, since we not use t_n
+      # f_np05.t = t + 0.5*dt  # - 0.5*dt  , not needed, since we not use t_n; identical to the one above.
+      f_np1.t = t + dt
 
       # Calculate RHS and solve
       if method == "EXPLICIT_EULER":  #Explicit Euler
-
-        L = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx
-        solve(a == L, u, bc)
+        L = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f, v)*dx        
+        # for u (= u_n+1) you need the bc at t_n+1, for L you need a bc at u_n, since it is explicit.
+        # Did you already try out using bc.apply()? I'm not sure whether solve with a bc is the right approach for explicit time-stepping.
+        # bc.apply(L, 0)
+        # u_D.t = t + dt  # to get bc at t_n+1 that has to be applied to u?
+        solve(a == L, u, bc)        
+        # rest for Explicit Euler looks good to me. the solve is basically just invetring the mass matrix in "a" and computes u (= u_np1)
 
       elif method == "HEUN":  #Heun's Method
 
         #TODO: Are the BCS updated correctly? (Also applies to RK4)
-        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx #Calculation of y'~_{n+1}
+        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_n, v)*dx #Calculation of y'~_{n+1}
+        # I think that we again need a bc.apply() here to catch the explicit part correctly.
         solve(a == L1, u1, bc) #Calculation of y~_{n+1}
-        L2 = inner(u1, v)*dx - dt*inner(grad(u1), grad(v))*dx + dt*inner(f, v)*dx
-        L = 0.5*(L1 + L2)
+        L2 = inner(u1, v)*dx - dt*inner(grad(u1), grad(v))*dx + dt*inner(f_np1, v)*dx
+        L = 0.5*(L1 + L2)        
         solve(a == L, u, bc)  #Calculation of y_{n+1}
 
       elif method == "RK4":  #4th Order Runge-Kutta's Method
@@ -131,6 +136,7 @@ def solve_PDE(method, T, num_steps):
       u_n.assign(u)
 
       iteration += 1
+      t += dt
 
   if type(approx_error) is not str:
     approx_error =  sqrt(approx_error*dt/T)
