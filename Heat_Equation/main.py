@@ -8,10 +8,10 @@ import os
 
 methods = ("RK4", "HEUN", "EXPLICIT_EULER")
 T = 1.0
-#steps = [80, 100, 120, 140, 160]
-steps = np.linspace(80, 640, 29)
+steps = np.array([120, 240, 480, 960])
+# steps = np.linspace(80, 640, 29)
 dt = T/steps
-dt = np.flip(dt)
+#dt = np.flip(dt)
 steps = steps.astype(int)
 
 i = 0
@@ -21,8 +21,8 @@ errors[:,:] = "NaN"
 
 for i in range(len(steps)):
     for j in range(len(methods)):
-        approx_error = solve_PDE.solve_PDE(methods[j], T, steps[i])
-        errors[i, j] = approx_error
+        error = solve_PDE.solve_PDE(methods[j], T, steps[i])
+        errors[i, j] = error
 
 # val = [["" for c in range(errors.shape[1])] for r in range(errors.shape[0])] 
 # fig1, ax = plt.subplots() 
@@ -45,16 +45,16 @@ for i in range(len(steps)):
 style.use('ggplot') 
 fig2 = plt.figure()
 axes = fig2.add_axes([0.1,0.1,0.8,0.8])
-axes.set_ylim([0,1e-13])    # When gamma = 0
-#axes.set_ylim([0,1e-01])   # When gamma = 1
+axes.set_ylim([0,2e-12])    # When gamma = 0
+# axes.set_ylim([0,1e-01])   # When gamma = 1
+axes.set_xlim(max(dt),min(dt))
 
 xx = dt
 plt.plot(xx, errors[:,0], 'b', linewidth=2)
 plt.plot(xx, errors[:,1], 'r', linewidth=2)
 plt.plot(xx, errors[:,2], 'g', linewidth=2)
-plt.legend(["Runge Kutta 4", "Heun", "Explicit Euler"])
+plt.legend(["RK4", "Heun", "Explicit Euler"])
 plt.xlabel("dt")
 plt.ylabel("Approximation Error")
-
 fig2.savefig('plot.jpg', bbox_inches='tight', dpi=150)
 os.system('wslview plot.jpg')

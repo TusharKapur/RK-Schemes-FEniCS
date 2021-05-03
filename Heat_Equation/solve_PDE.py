@@ -26,7 +26,7 @@ def solve_PDE(method, T, num_steps):
   dt = T / num_steps # time step size
   alpha = 3          # parameter alpha
   beta = 1.2         # parameter beta
-  gamma = 0          # parameter gamma (controls time dependence)
+  gamma = 1.0          # parameter gamma (controls time dependence)
 
   iteration = 0
   approx_error = 0.0
@@ -59,6 +59,11 @@ def solve_PDE(method, T, num_steps):
 
   bc = DirichletBC(V, u_D, boundary)
 
+  def LeastSquare(x, y):
+    from numpy import linalg
+    result = linalg.lstsq(x, y)[0]
+    return result
+
   # Define initial value
   u_n = interpolate(u_D, V)
   u1 = interpolate(u_D, V)
@@ -79,39 +84,104 @@ def solve_PDE(method, T, num_steps):
   for n in range(num_steps):
 
       # Update current time
-      t += dt
-      u_D.t = t
-      f_np1.t = t - dt
-      f_np2.t = t - 0.5*dt
-      f_np3.t = t - 0.5*dt
-      f.t = t
+      f_np1.t = t
+      f_np2.t = t + 0.5*dt
+      f_np3.t = t + 0.5*dt
+      f.t = t + dt
 
       # Calculate RHS and solve
       if method == "EXPLICIT_EULER":  #Explicit Euler
 
-        L = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx
-        solve(a == L, u, bc)
+        u_D.t = t + dt
+        bc = DirichletBC(V, u_D, boundary)
+        L = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f, v)*dx
+        A = assemble(a)
+        b = assemble(L)
+        bc.apply(A, b)
+        u = Function(V)
+        u.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L, u, bc)
 
       elif method == "HEUN":  #Heun's Method
 
-        #TODO: Are the BCS updated correctly? (Also applies to RK4)
-        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx #Calculation of y'~_{n+1}
-        solve(a == L1, u1, bc) #Calculation of y~_{n+1}
-        L2 = inner(u1, v)*dx - dt*inner(grad(u1), grad(v))*dx + dt*inner(f, v)*dx
-        L = 0.5*(L1 + L2)
-        solve(a == L, u, bc)  #Calculation of y_{n+1}
+        # Note: In Heun's method, we are solving for u at "t+dt" in both the steps. So, BC is updated to "t+dt" for these steps.
+        u_D.t = t + dt
+        bc = DirichletBC(V, u_D, boundary)
+        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx
+        slope1 = - inner(grad(u_n), grad(v))*dx + inner(f_np1, v)*dx #Calculation of y'~_{n+1}
+        A = assemble(a)
+        b = assemble(L1)
+        bc.apply(A, b)
+        u1 = Function(V)
+        u1.vector()[:] = LeastSquare(A.array(), b.get_local())        
+        # solve(a == L1, u1, bc) #Calculation of y~_{n+1}
+        
+        u_D.t = t + dt
+        bc = DirichletBC(V, u_D, boundary)
+        L2 = inner(u_n, v)*dx - dt*inner(grad(u1), grad(v))*dx + dt*inner(f, v)*dx
+        slope2 = - inner(grad(u1), grad(v))*dx + inner(f, v)*dx
+        # L1 -= inner(u_n, v)*dx
+        # L2 -= inner(u1, v)*dx
+        #L = 0.5*(L1 + L2)
+        slope = 0.5*(slope1 + slope2)
+        L = inner(u_n, v)*dx + dt*slope
+        A = assemble(a) # TODO: Repeatedly assembling A may not be necessary (also in RK4)
+        b = assemble(L)
+        bc.apply(A, b)
+        u = Function(V)
+        u.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L, u, bc)  #Calculation of y_{n+1}
 
       elif method == "RK4":  #4th Order Runge-Kutta's Method
-
-        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f, v)*dx
-        solve(a == L1, u1, bc)
-        L2 = inner(u1, v)*dx - 0.5*dt*inner(grad(u1), grad(v))*dx + 0.5*dt*inner(f_np1, v)*dx
-        solve(a == L2, u2, bc)
-        L3 = inner(u2, v)*dx - 0.5*dt*inner(grad(u2), grad(v))*dx + 0.5*dt*inner(f_np2, v)*dx
-        solve(a == L3, u3, bc)
-        L4 = inner(u3, v)*dx - dt*inner(grad(u3), grad(v))*dx + dt*inner(f_np3, v)*dx
-        L = (1/6)*(L1 + 2*L2 + 2*L3 + L4)
-        solve(a == L, u, bc)    
+        
+        # Note: In RK4 method, we are solving for u at "t+dt" in the 1st and 4th steps. So, BC is updated to "t+dt" for these steps.
+        # In 2nd and 3rd steps, we are solving for u at "t + dt/2". So, BC is updated to "t + dt/2" for these steps.
+        u_D.t = t + dt  
+        bc = DirichletBC(V, u_D, boundary)
+        L1 = inner(u_n, v)*dx - dt*inner(grad(u_n), grad(v))*dx + dt*inner(f_np1, v)*dx
+        slope1 = - inner(grad(u_n), grad(v))*dx + inner(f_np1, v)*dx
+        A = assemble(a)
+        b = assemble(L1)
+        bc.apply(A, b)
+        u1 = Function(V)
+        u1.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L1, u1, bc)
+        
+        u_D.t = t + 0.5*dt
+        bc = DirichletBC(V, u_D, boundary)
+        L2 = inner(u_n, v)*dx - 0.5*dt*inner(grad(u1), grad(v))*dx + 0.5*dt*inner(f_np2, v)*dx
+        slope2 = - inner(grad(u1), grad(v))*dx + inner(f_np2, v)*dx
+        A = assemble(a)
+        b = assemble(L2)
+        bc.apply(A, b)
+        u2 = Function(V)
+        u2.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L2, u2, bc)
+        
+        u_D.t = t + 0.5*dt
+        bc = DirichletBC(V, u_D, boundary)
+        L3 = inner(u_n, v)*dx - 0.5*dt*inner(grad(u2), grad(v))*dx + 0.5*dt*inner(f_np3, v)*dx
+        slope3 = - inner(grad(u2), grad(v))*dx + inner(f_np3, v)*dx
+        A = assemble(a)
+        b = assemble(L3)
+        bc.apply(A, b)
+        u3 = Function(V)
+        u3.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L3, u3, bc)
+        
+        u_D.t = t + dt
+        bc = DirichletBC(V, u_D, boundary)
+        L4 = inner(u_n, v)*dx - dt*inner(grad(u3), grad(v))*dx + dt*inner(f, v)*dx
+        slope4 = - inner(grad(u3), grad(v))*dx + inner(f, v)*dx
+        #L = (1/6)*(L1 + 2*L2 + 2*L3 + L4)     
+        slope = (1/6)*(slope1 + 2*slope2 + 2*slope3 + slope4)
+        L = inner(u_n, v)*dx + dt*slope
+        A = assemble(a)
+        b = assemble(L)
+        bc.apply(A, b)
+        u = Function(V)
+        u.vector()[:] = LeastSquare(A.array(), b.get_local())
+        # solve(a == L, u, bc)    
 
       # Plot solution
       #plot(u)
@@ -119,22 +189,23 @@ def solve_PDE(method, T, num_steps):
       # Compute error at vertices
       u_e = interpolate(u_D, V)
       error = np.abs(np.array(u_e.vector()) - np.array(u.vector())).max()
-      approx_error += error*error # Calculation continued later
+      # approx_error += error*error # Calculation continued later
       #print('t = %.2f: error = %.3g' % (t, error))
       if error > upper_tol:
         print("%s scheme diverged for timestep size: %.3g" %(method, dt))
         set_Diverged = 1
-        approx_error = "NaN"
+        error = "NaN"
         break
 
       # Update previous solution
       u_n.assign(u)
 
       iteration += 1
+      t += dt
 
-  if type(approx_error) is not str:
-    approx_error =  sqrt(approx_error*dt/T)
-    print(iteration, approx_error, method)
+  if type(error) is not str:
+    # approx_error =  sqrt(approx_error*dt/T)
+    print(iteration, error, method)
 
   # Hold plot
   #fig = plt.figure(figsize=(10,5))
@@ -142,4 +213,4 @@ def solve_PDE(method, T, num_steps):
   #fig.savefig('plot.jpg', bbox_inches='tight', dpi=150)
   #plt.show()
 
-  return approx_error
+  return error
