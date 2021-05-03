@@ -26,7 +26,7 @@ def solve_PDE(method, T, num_steps):
   dt = T / num_steps # time step size
   alpha = 3          # parameter alpha
   beta = 1.2         # parameter beta
-  gamma = 1.0          # parameter gamma (controls time dependence)
+  gamma = 0.8          # parameter gamma (controls time dependence)
 
   iteration = 0
   approx_error = 0.0

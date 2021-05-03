@@ -9,7 +9,7 @@ import os
 methods = ("RK4", "HEUN", "EXPLICIT_EULER")
 T = 1.0
 steps = np.array([120, 240, 480, 960])
-# steps = np.linspace(80, 640, 29)
+# steps = np.linspace(80, 640, 2)
 dt = T/steps
 #dt = np.flip(dt)
 steps = steps.astype(int)
@@ -45,8 +45,7 @@ for i in range(len(steps)):
 style.use('ggplot') 
 fig2 = plt.figure()
 axes = fig2.add_axes([0.1,0.1,0.8,0.8])
-axes.set_ylim([0,2e-12])    # When gamma = 0
-# axes.set_ylim([0,1e-01])   # When gamma = 1
+axes.set_yscale('log')
 axes.set_xlim(max(dt),min(dt))
 
 xx = dt
